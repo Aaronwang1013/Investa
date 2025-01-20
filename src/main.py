@@ -1,13 +1,37 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-
-
+from fastapi import FastAPI, Depends, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield   
+    yield
 
 
-# def api_app() -> FastAPI:
-#     from src.Trade.router import firstrade_router
+def api_app() -> FastAPI:
+    from src.auth.router import routers
+
+    api = FastAPI(
+        title="API",
+        docs_url="/docs",
+        redoc_url="/redoc",
+        version="0.1.0",
+    )
+
+    @api.exception_handler(ValidationError)
+    async def validation_exception_handler(request: Request, exc: ValidationError):
+        return JSONResponse(
+            status_code=422,
+            content=jsonable_encoder({"detail": exc.errors()}),
+        )
+    
+    api.include_router(routers.router, prefix="/auth")
+
+
+    return api
+
+app = FastAPI(title="Investa platform", version="0.1.0", lifespan=lifespan)
+
+app.mount("/api/v1", api_app())
