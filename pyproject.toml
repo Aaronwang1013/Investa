@@ -12,7 +12,14 @@ fastapi = "^0.115.6"
 firstrade = "^0.0.30"
 pydantic-settings = "^2.7.1"
 pyotp = "^2.9.0"
+uvicorn = "^0.34.0"
 
+
+[tool.poetry.group.dev.dependencies]
+poethepoet = "^0.32.1"
+
+[tool.poe.tasks]
+dev = "uvicorn src.main:app --reload --port 8001"
 
 [build-system]
 requires = ["poetry-core"]
