@@ -27,10 +27,10 @@ class User(Base, TimeStampMixin):
     __tablename__ = "users"
     __repr_attrs__ = ("id", "username", "email", "is_active", "is_superuser")
 
-    id: Mapped[sa.Integer] = mapped_column(sa.Integer, primary_key=True)
-    username: Mapped[sa.String] = mapped_column(sa.String, nullable=False)
-    email: Mapped[sa.String] = mapped_column(sa.String, nullable=False)
-    password: Mapped[sa.String] = mapped_column(sa.String, nullable=False)
+    id: Mapped[sa.Integer] = mapped_column(sa.BigInteger(), primary_key=True)
+    username: Mapped[sa.String] = mapped_column(sa.String(255), nullable=False)
+    email: Mapped[sa.String] = mapped_column(sa.String(255), nullable=False)
+    password: Mapped[sa.String] = mapped_column(sa.String(255), nullable=False)
     is_active: Mapped[sa.Boolean] = mapped_column(sa.Boolean, default=True)
     is_superuser: Mapped[sa.Boolean] = mapped_column(sa.Boolean, default=False)
 
