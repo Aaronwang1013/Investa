@@ -7,7 +7,7 @@ class _settings(BaseSettings):
     USERNAME: str = ""
     PASSWORD: str = ""
     EMAIL: str = ""
-    
+    APP_DEBUG: bool = False
     #auth
     SECRET_KEY: str = ""
     ALGORITHM: str = ""
@@ -24,6 +24,13 @@ class _settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore"
     )
+
+    #mysql
+    DB_HOST: str = ""
+    DB_PORT: int = 5432
+    MYSQL_DB_NAME: str = ""
+    MYSQL_DB_USER: str = ""
+    MYSQL_DB_PASSWORD: str = ""
 
 
 

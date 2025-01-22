@@ -11,7 +11,8 @@ async def lifespan(app: FastAPI):
 
 
 def api_app() -> FastAPI:
-    from src.auth.router import routers
+    from src.auth import routers
+    # from src.user.routers import router as user_router
 
     api = FastAPI(
         title="API",
@@ -26,11 +27,11 @@ def api_app() -> FastAPI:
             status_code=422,
             content=jsonable_encoder({"detail": exc.errors()}),
         )
-    
-    api.include_router(routers.router, prefix="/auth")
 
+    api.include_router(routers.router, prefix="/auth", tags=["auth"])
 
     return api
+
 
 app = FastAPI(title="Investa platform", version="0.1.0", lifespan=lifespan)
 
