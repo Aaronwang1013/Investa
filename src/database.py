@@ -1,13 +1,17 @@
-from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    create_async_engine,
+    async_sessionmaker,
+)
 from sqlalchemy.engine import URL
-from sqlalchemy.orm import Session, sessionmaker
 
 from src.config import settings
 
 
 def _conntection_url() -> str:
     return URL.create(
-        drivername="mysql+pymysql",
+        drivername="mysql+aiomysql",
         host=settings.DB_HOST,
         username=settings.MYSQL_DB_USER,
         password=settings.MYSQL_DB_PASSWORD,
@@ -16,7 +20,7 @@ def _conntection_url() -> str:
     )
 
 
-engine = create_engine(
+engine: AsyncEngine = create_async_engine(
     _conntection_url(),
     echo=settings.APP_DEBUG,
     future=True,
@@ -25,18 +29,17 @@ engine = create_engine(
 )
 
 
-LocalSession = sessionmaker(bind=engine)
+AsessionSessionLocal = async_sessionmaker(
+    bind=engine, class_=AsyncSession, expire_on_commit=False
+)
 
-def get_db():
-    db = LocalSession()
 
-    try:
-        yield db
-
-    except Exception as e:
-        db.rollback()
-        raise e
-
-    finally:
-        db.close()
-
+async def get_db() -> AsyncSession:
+    async with AsessionSessionLocal() as session:
+        try:
+            yield session
+        except Exception as e:
+            await session.rollback()
+            raise e
+        finally:
+            await session.close()

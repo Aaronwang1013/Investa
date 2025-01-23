@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.auth.request import LoginRequest
+from src.auth.request import LoginRequest, RegisterRequest
 from src.auth.service import AuthService
+from src.user.service import UserService
 from src.database import get_db
 from src.config import settings
 
@@ -15,10 +16,26 @@ auth_service = AuthService(
 )
 
 
+@router.post("/register")
+async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    existed_user = await UserService.get_user_by_email(db, request.email)
+    if existed_user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered",
+        )
+    user = await UserService.create_user(request, db)
+    print("user", user)
+    return {"message": "User created successfully"}
+
+
 @router.post("/login")
-async def login(login_data: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
+    print("email", request.email)
+    print("password", request.password)
+    print("db", db)
     try:
-        return await auth_service.login(login_data, db)
+        return await auth_service.login(request, db)
     except HTTPException as e:
         raise e
     except Exception as e:
