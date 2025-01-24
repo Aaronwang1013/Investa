@@ -25,15 +25,11 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
             detail="Email already registered",
         )
     user = await UserService.create_user(request, db)
-    print("user", user)
     return {"message": "User created successfully"}
 
 
 @router.post("/login")
 async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
-    print("email", request.email)
-    print("password", request.password)
-    print("db", db)
     try:
         return await auth_service.login(request, db)
     except HTTPException as e:
