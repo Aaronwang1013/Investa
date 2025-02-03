@@ -16,6 +16,14 @@ class AuthService:
         self.secret_key = secret_key
         self.algorithm = algorithm
         self.access_token_expire_minutes = access_token_expire_minutes
+    
+    @staticmethod
+    def hash_password(password: str) -> str:
+        return password_context.hash(password)
+    
+    @staticmethod
+    def verify_password(plain_password: str, hashed_password: str) -> bool:
+        return password_context.verify(plain_password, hashed_password)
 
     def create_access_token(
         self, data: dict, expire_delta: timedelta | None = None
@@ -61,8 +69,5 @@ class AuthService:
         token = self.create_access_token({"sub": user.email})
         return TokenResponse(access_token=token, token_type="bearer")
 
-    def hash_password(password: str) -> str:
-        return password_context.hash(password)
 
-    def verify_password(plain_password: str, hashed_password: str) -> bool:
-        return password_context.verify(plain_password, hashed_password)
+    
