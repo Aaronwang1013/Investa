@@ -6,7 +6,13 @@ password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 async def get_db() -> AsyncSession:
-    from src.database import LocalSession
+    from src.database import AsyncSessionLocal
 
-    async with LocalSession() as session:
-        yield session
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        except Exception as e:
+            await session.rollback()
+            raise e
+        finally:
+            await session.close()

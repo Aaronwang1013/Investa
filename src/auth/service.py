@@ -1,4 +1,3 @@
-from passlib.context import CryptContext
 from fastapi import HTTPException, status
 from datetime import datetime, timedelta, timezone
 import jwt
@@ -7,6 +6,7 @@ from src.auth.schema import TokenResponse
 from src.dependencies import password_context
 from src.user.service import UserService
 from sqlalchemy.ext.asyncio import AsyncSession
+from config import settings
 
 
 class AuthService:
@@ -16,11 +16,11 @@ class AuthService:
         self.secret_key = secret_key
         self.algorithm = algorithm
         self.access_token_expire_minutes = access_token_expire_minutes
-    
+
     @staticmethod
     def hash_password(password: str) -> str:
         return password_context.hash(password)
-    
+
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
         return password_context.verify(plain_password, hashed_password)
@@ -54,7 +54,7 @@ class AuthService:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token",
-                headers={"WWW-Authenticate": "Bearer"},
+                headers={"WWW-Authe nticate": "Bearer"},
             )
 
     async def login(
@@ -69,5 +69,9 @@ class AuthService:
         token = self.create_access_token({"sub": user.email})
         return TokenResponse(access_token=token, token_type="bearer")
 
-
-    
+    async def authenticate_user(self, session: AsyncSession, email: str, password: str):
+        user = await UserService.get_user_by_email(session, email)
+        if not user or not self.verify_password(password, user.password):
+            return False
+        else:
+            return user
