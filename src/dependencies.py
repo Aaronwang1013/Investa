@@ -1,4 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import Depends, Request
+from fastapi_view import inertia
 from passlib.context import CryptContext
 
 
@@ -16,3 +18,5 @@ async def get_db() -> AsyncSession:
             raise e
         finally:
             await session.close()
+
+

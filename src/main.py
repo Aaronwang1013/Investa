@@ -2,11 +2,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from fastapi_view import inertia, view
 from pydantic import ValidationError
+
+from src.config import settings, vite
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # vite.jinja2_env_import(view.templates.env)
+    inertia.share("version", settings.APP_VERSION)
+
     yield
 
 
@@ -34,6 +40,17 @@ def api_app() -> FastAPI:
     return api
 
 
+def web_app() -> FastAPI:
+    from src.views import routers as view_routers
+
+    web = FastAPI(title="Web")
+
+    web.include_router(view_routers.router, prefix="", tags=["home"])
+
+    return web
+
+
 app = FastAPI(title="Investa platform", version="0.1.0", lifespan=lifespan)
 
 app.mount("/api/v1", api_app())
+app.mount("/", web_app())
