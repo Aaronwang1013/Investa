@@ -1,13 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Form
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
-from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.auth.request import LoginRequest, RegisterRequest, OauthLoginRequest
 from src.auth.service import AuthService
-from src.user.service import UserService
 from src.database import get_db
 from src.config import settings
-import logging
+import httpx
 
 
 router = APIRouter()
@@ -18,66 +15,89 @@ auth_service = AuthService(
     access_token_expire_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
 )
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
-
-
-@router.post("/register")
-async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db)):
-    existed_user = await UserService.get_user_by_email(db, request.email)
-    if existed_user:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered",
-        )
-    user = await UserService.create_user(request, db)
-    return JSONResponse(
-        status_code=status.HTTP_201_CREATED,
-        content={"message": "User created successfully", "email": user.email},
-        headers={"Location": f"/users/{user.id}"},
-    )
-
-
-# @router.post("/login")
-# async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
-#     try:
-#         token_response = await auth_service.login(db, request)
-
-#         return JSONResponse(
-#             status_code=status.HTTP_200_OK,
-#             content={
-#                 "status": "success",
-#                 "message": "Login successful",
-#                 "data": {
-#                     "access_token": token_response.access_token,
-#                     "token_type": token_response.token_type,
-#                     "expires_in": auth_service.access_token_expire_minutes,
-#                 },
-#             },
-#         )
-#     except HTTPException as http_exp:
-#         logging.warning(f"Login failed for {request.email}, {http_exp.detail}")
-#         raise http_exp
-#     except Exception as e:
-#         logging.error(f"Internal server error during login: {str(e)}")
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail="Internal server error",
-#         )
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 
 @router.post("/token")
 async def login(
-    from_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    grant_type: str = Form(default="password"),
+    provider: str = Form(None),
+    oauth_token: str = Form(None),
+    db: AsyncSession = Depends(get_db),
 ):
-    user = await auth_service.authenticate_user(
-        db, from_data.username, from_data.password
-    )
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
+    if grant_type == "password":
+        user = await auth_service.authenticate_user(
+            db, form_data.username, form_data.password
         )
-    access_token = auth_service.create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        access_token = auth_service.create_access_token({"sub": user.email})
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES,
+        }
+    elif grant_type == "oauth":
+        if not provider or not oauth_token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="provider and oauth_token are required",
+            )
+        token_response = await auth_service.oauth_login(provider, db, oauth_token)
+        return {
+            "access_token": token_response.access_token,
+            "token_type": "bearer",
+            "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES,
+        }
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unspported grant_type",
+        )
+
+
+@router.get("/callback")
+async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
+    if not code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Authorization code is required",
+        )
+    token_url = "https://oauth2.googleapis.com/token"
+    data = {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "client_secret": settings.GOOGLE_CLIENT_SECRET,
+        "code": code,
+        "grant_type": "authorization_code",
+        "redirect_uri": "http://localhost:8001/auth/callback",
+    }
+    async with httpx.AsyncClient() as client:
+        response = await client.post(token_url, data=data)
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Unable to retrieve token",
+            )
+        token = response.json()
+    access_token = token.get("access_token")
+
+    user_info_url = "https://www.googleapis.com/oauth2/v1/userinfo"
+
+    async with httpx.AsyncClient() as client:
+        user_response = await client.get(f"{user_info_url}?access_token={access_token}")
+        if user_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to fetch user info.")
+        user_info = user_response.json()
+
+    email = user_info.get("email")
+    name = user_info.get("name")
+
+    user = await auth_service.oauth_login("google", db, access_token)
+
+    jwt_token = auth_service.create_access_token({"sub": user.email})
+    return {"access_token": jwt_token, "token_type": "bearer"}

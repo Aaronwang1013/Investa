@@ -11,7 +11,8 @@ async def lifespan(app: FastAPI):
 
 
 def api_app() -> FastAPI:
-    from src.auth import routers
+    from src.auth import routers as auth_routers
+    from src.user import routers as user_routers
     # from src.user.routers import router as user_router
 
     api = FastAPI(
@@ -28,8 +29,8 @@ def api_app() -> FastAPI:
             content=jsonable_encoder({"detail": exc.errors()}),
         )
 
-    api.include_router(routers.router, prefix="/auth", tags=["auth"])
-
+    api.include_router(auth_routers.router, prefix="/auth", tags=["auth"])
+    api.include_router(user_routers.router, prefix="/users", tags=["users"])
     return api
 
 
